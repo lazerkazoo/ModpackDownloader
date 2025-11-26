@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from os import makedirs, rename
+from os import listdir, makedirs, rename
 from os.path import expanduser
 from shutil import copy, copytree
 from subprocess import run
@@ -122,15 +122,25 @@ def install_modpack():
         json.dump(launcher_data, f, indent=2)
 
     print(f"Created launcher profile '{name}' ({profile_id})")
+    copytree("/tmp/modpack", f"{dir}/mrpack", dirs_exist_ok=True)
 
 
-def search_modrinth(type=None, version=None):
+def search_modrinth(type=None, version=None, modpack=None):
     if type is None:
         types = ["mod", "modpack"]
         for num, t in enumerate(types):
             print(f"[{num + 1}] {t}")
         try:
             type = types[int(input("choose -> ")) - 1]
+            if type == "mod":
+                for num, i in enumerate(listdir(f"{MC_DIR}/instances")):
+                    print(f"[{num + 1}] {i}")
+                choice = int(input("choose -> ")) - 1
+                modpack = listdir(f"{MC_DIR}/instances")[choice]
+                file = json.load(
+                    open(f"{MC_DIR}/instances/{modpack}/mrpack/modrinth.index.json")
+                )
+                version = file["dependencies"]["minecraft"]
         except (EOFError, ValueError, KeyboardInterrupt):
             print("No input provided. Exiting.")
             return
@@ -176,7 +186,10 @@ def search_modrinth(type=None, version=None):
         if "fabric" in v["loaders"] and version in v["game_versions"]:
             file_url = v["files"][0]["url"]
             file_name = v["files"][0]["filename"]
-            download_file(file_url, f"/tmp/{file_name}")
+            dir = f"/tmp/{file_name}"
+            if type == "mod":
+                dir = f"{MC_DIR}/instances/{modpack}/mods/{file_name}"
+            download_file(file_url, dir)
             if type == "modpack":
                 extract_modpack(f"/tmp/{file_name}")
                 install_modpack()
@@ -185,7 +198,7 @@ def search_modrinth(type=None, version=None):
     if type == "mod":
         try:
             if input("another [y/n] -> ") in ["Y", "y", ""]:
-                search_modrinth(type, version)
+                search_modrinth(type, version, modpack)
         except (EOFError, KeyboardInterrupt):
             print("No input provided. Exiting.")
             return
