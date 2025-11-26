@@ -1,7 +1,6 @@
 import json
 from os import makedirs
 from os.path import expanduser
-from subprocess import run
 from time import time
 from zipfile import ZipFile
 
@@ -86,9 +85,9 @@ def search_modrinth(type=None, version=None):
         if "fabric" in v["loaders"] and version in v["game_versions"]:
             file_url = v["files"][0]["url"]
             file_name = v["files"][0]["filename"]
-            download_file(file_url, f"{expanduser('~')}/Downloads/{file_name}")
+            download_file(file_url, f"/tmp/{file_name}")
             if type == "modpack":
-                extract_modpack(f"{expanduser('~')}/Downloads/{file_name}")
+                extract_modpack(f"/tmp/{file_name}")
                 install_modpack()
             break
 
