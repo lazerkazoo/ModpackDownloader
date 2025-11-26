@@ -1,7 +1,11 @@
 import json
-from os import makedirs
+from datetime import datetime
+from os import makedirs, rename
 from os.path import expanduser
+from shutil import copy, copytree
+from subprocess import run
 from time import time
+from uuid import uuid4
 from zipfile import ZipFile
 
 import requests
@@ -30,23 +34,94 @@ def get_modrinth_index():
         return json.load(f)
 
 
+def install_fabric(mc: str, loader: str):
+    print("installing fabric...")
+    download_file(
+        "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.1.0/fabric-installer-1.1.0.jar",
+        "/tmp/fabric-installer.jar",
+    )
+    run(
+        [
+            "java",
+            "-jar",
+            "/tmp/fabric-installer.jar",
+            "client",
+            "-mcversion",
+            mc,
+            "-loader",
+            loader,
+            "-downloadMinecraft",
+            "-noprofile",
+        ]
+    )
+
+
 def install_modpack():
     st = time()
     data = get_modrinth_index()
+    depends = data["dependencies"]
     name = data["name"]
     files = data["files"]
     dir = f"{MC_DIR}/instances/{name}"
+    copytree(
+        "/tmp/modpack/overrides/", f"{MC_DIR}/instances/{name}/", dirs_exist_ok=True
+    )
     makedirs(f"{dir}/mods", exist_ok=True)
-    downloads = {}
-    for i in files:
-        if i["downloads"][0].endswith(".jar"):
-            downloads[i["downloads"][0]] = f"{dir}/{i['path']}"
 
-    for num, i in enumerate(downloads):
-        print(f"[{num + 1}/{len(downloads)}] downloading {i.split('/')[-1]}")
-        download_file(i, downloads[i])
+    install_fabric(depends["minecraft"], depends["fabric-loader"])
+    copytree(
+        f"{MC_DIR}/versions/fabric-loader-{depends['fabric-loader']}-{depends['minecraft']}",
+        f"{MC_DIR}/versions/{name}",
+        dirs_exist_ok=True,
+    )
+    rename(
+        f"{MC_DIR}/versions/{name}/fabric-loader-{depends['fabric-loader']}-{depends['minecraft']}.json",
+        f"{MC_DIR}/versions/{name}/{name}.json",
+    )
 
-    print(f"downloaded mods in {round(time() - st, 2)}!")
+    copy(
+        f"{MC_DIR}/libraries/net/fabricmc/intermediary/{depends['minecraft']}/intermediary-{depends['minecraft']}.jar",
+        f"{MC_DIR}/versions/{name}/{name}.jar",
+    )
+
+    # Update the JSON to have correct id
+    with open(f"{MC_DIR}/versions/{name}/{name}.json", "r") as f:
+        version_data = json.load(f)
+    version_data["id"] = name
+    with open(f"{MC_DIR}/versions/{name}/{name}.json", "w") as f:
+        json.dump(version_data, f, indent=2)
+
+    downloads = {i["downloads"][0]: f"{dir}/{i['path']}" for i in files}
+
+    for num, url in enumerate(downloads):
+        if url.endswith(".jar"):
+            print(f"[{num + 1}/{len(downloads)}] downloading {url.split('/')[-1]}")
+            download_file(url, downloads[url])
+
+    print(f"\ndownloaded mods in {round(time() - st, 2)}s!")
+
+    with open(f"{MC_DIR}/launcher_profiles.json", "r") as f:
+        launcher_data = json.load(f)
+
+    profiles = launcher_data.setdefault("profiles", {})
+
+    profile_id = uuid4().hex  # UUID as json-safe string
+    timestamp = datetime.utcnow().isoformat() + "Z"
+
+    profiles[profile_id] = {
+        "created": timestamp,
+        "lastUsed": timestamp,
+        "icon": "Grass",
+        "name": name,
+        "type": "custom",
+        "lastVersionId": name,
+        "gameDir": f"{MC_DIR}/instances/{name}",
+    }
+
+    with open(f"{MC_DIR}/launcher_profiles.json", "w") as f:
+        json.dump(launcher_data, f, indent=2)
+
+    print(f"Created launcher profile '{name}' ({profile_id})")
 
 
 def search_modrinth(type=None, version=None):
@@ -54,10 +129,22 @@ def search_modrinth(type=None, version=None):
         types = ["mod", "modpack"]
         for num, t in enumerate(types):
             print(f"[{num + 1}] {t}")
-        type = types[int(input("choose -> ")) - 1]
+        try:
+            type = types[int(input("choose -> ")) - 1]
+        except (EOFError, ValueError, KeyboardInterrupt):
+            print("No input provided. Exiting.")
+            return
     if version is None:
-        version = input("mc version -> ")
-    query = input("search modrinth -> ")
+        try:
+            version = input("mc version -> ")
+        except (EOFError, KeyboardInterrupt):
+            print("No input provided. Exiting.")
+            return
+    try:
+        query = input("search modrinth -> ")
+    except (EOFError, KeyboardInterrupt):
+        print("No input provided. Exiting.")
+        return
     params = {
         "query": query,
         "facets": f'[["project_type:{type}"], ["categories:fabric"], ["versions:{version}"]]',
@@ -71,9 +158,13 @@ def search_modrinth(type=None, version=None):
         search_modrinth(type, version)
 
     for num, hit in enumerate(hits):
-        print(f"[{num + 1}] {hit['title']} - {hit['project_type']}")
+        print(f"[{num + 1}] {hit['title']}")
 
-    choice = int(input("choose -> ")) - 1
+    try:
+        choice = int(input("choose -> ")) - 1
+    except (EOFError, ValueError, KeyboardInterrupt):
+        print("No input provided. Exiting.")
+        return
 
     project_id = hits[choice]["project_id"]
 
@@ -92,8 +183,12 @@ def search_modrinth(type=None, version=None):
             break
 
     if type == "mod":
-        if input("another [y/n] -> ") in ["Y", "y", ""]:
-            search_modrinth(type, version)
+        try:
+            if input("another [y/n] -> ") in ["Y", "y", ""]:
+                search_modrinth(type, version)
+        except (EOFError, KeyboardInterrupt):
+            print("No input provided. Exiting.")
+            return
 
     exit()
 
