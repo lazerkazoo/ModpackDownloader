@@ -226,9 +226,12 @@ def search_modrinth(type=None, version=None, modpack=None):
         print(colored(f"no {type}s found", "red"))
         search_modrinth(type, version)
 
-    choice = choose(hits, type)
+    for num, hit in enumerate(hits):
+        print(f"[{num + 1}] {hit['title']}")
 
-    project_id = hits[choice]["project_id"]
+    choice = hits[int(input("choose -> ")) - 1]
+
+    project_id = choice["project_id"]
 
     versions = requests.get(
         f"https://api.modrinth.com/v2/project/{project_id}/version"
