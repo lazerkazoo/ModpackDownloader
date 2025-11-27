@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from os import listdir, makedirs, rename
+from os import listdir, makedirs, remove, rename
 from os.path import abspath, dirname, exists, expanduser
 from shutil import copy, copytree, rmtree
 from subprocess import run
@@ -36,15 +36,14 @@ def get_modpacks():
     return listdir(f"{MC_DIR}/instances")
 
 
-def choose_modpack():
-    packs = get_modpacks()
-    if len(packs) <= 0:
-        print(colored("no modpacks installed!", "yellow"))
+def choose(lst: list, stuff: str = "stuff"):
+    if len(lst) <= 0:
+        print(colored(f"no {stuff}s installed!", "yellow"))
         main()
-    for num, i in enumerate(packs):
+    for num, i in enumerate(lst):
         print(f"[{num + 1}] {i}")
 
-    return packs[int(input("choose -> ")) - 1]
+    return lst[int(input("choose -> ")) - 1]
 
 
 def get_modrinth_index(file="/tmp/modpack/"):
@@ -147,8 +146,18 @@ def install_modpack():
     copytree("/tmp/modpack", f"{dir}/mrpack", dirs_exist_ok=True)
 
 
+def remove_mod():
+    pack = choose(get_modpacks(), "modpack")
+    mods_dir = f"{MC_DIR}/instances/{pack}/mods"
+    mods = []
+    for m in listdir(mods_dir):
+        mods.append(m)
+
+    remove(f"{mods_dir}/{choose(mods)}")
+
+
 def remove_modpack():
-    pack = choose_modpack()
+    pack = choose(get_modpacks(), "modpack")
     profiles_file = f"{MC_DIR}/launcher_profiles.json"
 
     with open(profiles_file, "r") as f:
@@ -179,19 +188,14 @@ def remove_modpack():
 def search_modrinth(type=None, version=None, modpack=None):
     if type is None:
         types = ["mod", "modpack", "resourcepack", "shader"]
-        for num, t in enumerate(types):
-            print(f"[{num + 1}] {t}")
-        try:
-            type = types[int(input("choose -> ")) - 1]
-            if type != "modpack":
-                modpack = choose_modpack()
-                file = json.load(
-                    open(f"{MC_DIR}/instances/{modpack}/mrpack/modrinth.index.json")
-                )
-                version = file["dependencies"]["minecraft"]
-        except (EOFError, ValueError, KeyboardInterrupt):
-            print(colored("no input provided, restarting"))
-            main()
+        type = choose(types)
+        if type != "modpack":
+            modpack = choose(get_modpacks(), "modpack")
+            file = json.load(
+                open(f"{MC_DIR}/instances/{modpack}/mrpack/modrinth.index.json")
+            )
+            version = file["dependencies"]["minecraft"]
+
     if version is None:
         try:
             version = input("mc version [just press enter to search all versions] -> ")
@@ -222,10 +226,7 @@ def search_modrinth(type=None, version=None, modpack=None):
         print(colored(f"no {type}s found", "red"))
         search_modrinth(type, version)
 
-    for num, hit in enumerate(hits):
-        print(f"[{num + 1}] {hit['title']}")
-
-    choice = int(input("choose -> ")) - 1
+    choice = choose(hits, type)
 
     project_id = hits[choice]["project_id"]
 
@@ -239,9 +240,7 @@ def search_modrinth(type=None, version=None, modpack=None):
 
     for v in versions:
         if version == "":
-            for num, i in enumerate(reversed(vers)):
-                print(f"[{num + 1}] {i}")
-            version = vers[int(input("choose game version -> ")) - 1]
+            version = choose(list(reversed(vers)), "version")
         if "fabric" in v["loaders"] and version in v["game_versions"]:
             dirs = {
                 "mod": "mods",
@@ -270,14 +269,13 @@ def search_modrinth(type=None, version=None, modpack=None):
 
 
 def main():
-    options = {"search modrinth": search_modrinth, "remove modpack": remove_modpack}
-    stuff = []
-    for num, i in enumerate(options):
-        print(f"[{num + 1}] {i}")
-        stuff.append(i)
+    options = {
+        "search modrinth": search_modrinth,
+        "remove modpack": remove_modpack,
+        "remove mod from pack": remove_mod,
+    }
 
-    choice = int(input("choose -> ")) - 1
-    options[stuff[choice]]()
+    options[choose(list(options.keys()))]()
 
 
 main()
