@@ -29,8 +29,20 @@ def extract_modpack(file):
         z.extractall("/tmp/modpack")
 
 
-def get_modrinth_index():
-    with open("/tmp/modpack/modrinth.index.json", "r") as f:
+def get_modpacks():
+    return listdir(f"{MC_DIR}/instances")
+
+
+def choose_modpack():
+    packs = get_modpacks()
+    for num, i in enumerate(packs):
+        print(f"[{num + 1}] {i}")
+
+    return packs[int(input("choose -> ")) - 1]
+
+
+def get_modrinth_index(file="/tmp/modpack/"):
+    with open(f"{file}/modrinth.index.json", "r") as f:
         return json.load(f)
 
 
@@ -133,10 +145,7 @@ def search_modrinth(type=None, version=None, modpack=None):
         try:
             type = types[int(input("choose -> ")) - 1]
             if type == "mod":
-                for num, i in enumerate(listdir(f"{MC_DIR}/instances")):
-                    print(f"[{num + 1}] {i}")
-                choice = int(input("choose -> ")) - 1
-                modpack = listdir(f"{MC_DIR}/instances")[choice]
+                modpack = choose_modpack()
                 file = json.load(
                     open(f"{MC_DIR}/instances/{modpack}/mrpack/modrinth.index.json")
                 )
