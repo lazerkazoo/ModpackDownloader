@@ -21,29 +21,19 @@ DOWNLOADS = f"{HOME}/Downloads"
 session = requests.Session()
 
 
-def remove_old_versions(mods_dir: str, new_filename: str):
-    base = re.split(r"[-_]?\d", new_filename, maxsplit=1)[0]
-
-    for file in listdir(mods_dir):
-        if file == new_filename:
-            continue
-
-        if file.startswith(base):
-            print(colored(f"Removing old version: {file}", "red"))
-            remove(f"{mods_dir}/{file}")
-
-
-def download_file(url: str, dest: str, session=session):
+def download_file(url: str, dest: str):
     if not exists(dirname(dest)):
         makedirs(dirname(dest), exist_ok=True)
-    with session.get(url, stream=True) as r:
-        r.raise_for_status()
+    with requests.get(url, stream=True) as r:
         with open(dest, "wb") as f:
             for chunk in r.iter_content(1024 * 1024 * 8):
                 f.write(chunk)
 
 
 def download_depends(file: str, version: str, pack: str):
+    if exists("/tmp/mod"):
+        rmtree("/tmp/mod")
+
     with ZipFile(file, "r") as z:
         z.extractall("/tmp/mod")
 
@@ -51,6 +41,12 @@ def download_depends(file: str, version: str, pack: str):
         data = json.load(f)
 
     depends = data["depends"]
+    if "minecraft" in depends:
+        depends.pop("minecraft")
+    if "fabricloader" in depends:
+        depends.pop("fabricloader")
+    if "fabric-api" in depends:
+        depends.pop("fabric-api")
 
     if len(depends) <= 0:
         return
@@ -73,7 +69,6 @@ def download_depends(file: str, version: str, pack: str):
                 file_url = v["files"][0]["url"]
                 file_name = v["files"][0]["filename"]
                 mods_dir = f"{MC_DIR}/instances/{pack}/mods"
-                remove_old_versions(mods_dir, file_name)
                 download_file(file_url, f"{mods_dir}/{file_name}")
 
 
@@ -110,26 +105,27 @@ def get_modrinth_index(file="/tmp/modpack/"):
         return json.load(f)
 
 
-def install_fabric(mc: str, loader: str):
+def install_fabric(mc: str, loader: str = ""):
     print("installing fabric...")
     download_file(
         "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.1.0/fabric-installer-1.1.0.jar",
         "/tmp/fabric-installer.jar",
     )
-    run(
-        [
-            "java",
-            "-jar",
-            "/tmp/fabric-installer.jar",
-            "client",
-            "-mcversion",
-            mc,
-            "-loader",
-            loader,
-            "-downloadMinecraft",
-            "-noprofile",
-        ]
-    )
+
+    cmd = [
+        "java",
+        "-jar",
+        "/tmp/fabric-installer.jar",
+        "client",
+        "-mcversion",
+        mc,
+        "-noprofile",
+    ]
+
+    if loader != "":
+        cmd.extend(["-loader", loader])
+
+    run(cmd)
 
 
 def install_modpack():
@@ -365,12 +361,11 @@ def search_modrinth(type=None, version=None, modpack=None):
             }
 
             if type != "modpack":
-                index_file = get_modrinth_index(abspath(dirname(index_file)))
+                index_file = get_modrinth_index(f"{MC_DIR}/instances/{modpack}/mrpack/")
                 type_dir = f"{MC_DIR}/instances/{modpack}/{dirs[type]}"
                 target = f"{type_dir}/{file_name}"
 
                 makedirs(abspath(type_dir), exist_ok=True)
-                remove_old_versions(type_dir, file_name)
 
                 print(colored(f"downloading {file_name}...", "yellow"))
                 download_file(file_url, target)
