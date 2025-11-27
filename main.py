@@ -178,12 +178,12 @@ def remove_modpack():
 
 def search_modrinth(type=None, version=None, modpack=None):
     if type is None:
-        types = ["mod", "modpack"]
+        types = ["mod", "modpack", "resourcepack", "shader"]
         for num, t in enumerate(types):
             print(f"[{num + 1}] {t}")
         try:
             type = types[int(input("choose -> ")) - 1]
-            if type == "mod":
+            if type != "modpack":
                 modpack = choose_modpack()
                 file = json.load(
                     open(f"{MC_DIR}/instances/{modpack}/mrpack/modrinth.index.json")
@@ -204,6 +204,11 @@ def search_modrinth(type=None, version=None, modpack=None):
             "query": query,
             "facets": f'[["project_type:{type}"], ["categories:fabric"]]',
         }
+    elif type in ["resourcepack", "shader"]:
+        params = {
+            "query": query,
+            "facets": f'[["project_type:{type}"]]',
+        }
     else:
         params = {
             "query": query,
@@ -214,7 +219,7 @@ def search_modrinth(type=None, version=None, modpack=None):
     r_data = response.json()
     hits = r_data["hits"]
     if len(hits) <= 0:
-        print(colored(f"no {type}s found"), "red")
+        print(colored(f"no {type}s found", "red"))
         search_modrinth(type, version)
 
     for num, hit in enumerate(hits):
@@ -229,7 +234,7 @@ def search_modrinth(type=None, version=None, modpack=None):
     ).json()
     vers = []
     for v in versions:
-        if not v["game_versions"][0] in vers:
+        if v["game_versions"][0] not in vers:
             vers.append(v["game_versions"][0])
 
     for v in versions:
@@ -238,18 +243,24 @@ def search_modrinth(type=None, version=None, modpack=None):
                 print(f"[{num + 1}] {i}")
             version = vers[int(input("choose game version -> ")) - 1]
         if "fabric" in v["loaders"] and version in v["game_versions"]:
+            dirs = {
+                "mod": "mods",
+                "resourcepack": "resourcepacks",
+                "shader": "shaderpacks",
+            }
             file_url = v["files"][0]["url"]
             file_name = v["files"][0]["filename"]
             dir = f"/tmp/{file_name}"
-            if type == "mod":
-                dir = f"{MC_DIR}/instances/{modpack}/mods/{file_name}"
+            if type != "modpack":
+                dir = f"{MC_DIR}/instances/{modpack}/{dirs[type]}/{file_name}"
+                makedirs(dir, exist_ok=True)
             download_file(file_url, dir)
             if type == "modpack":
                 extract_modpack(f"/tmp/{file_name}")
                 install_modpack()
             break
 
-    if type == "mod":
+    if type != "modpack":
         try:
             if input("another [y/n] -> ") in ["Y", "y", ""]:
                 search_modrinth(type, version, modpack)
