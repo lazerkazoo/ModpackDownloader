@@ -4,6 +4,7 @@ from os import listdir, makedirs, remove, rename
 from os.path import abspath, dirname, exists, expanduser
 from shutil import copy, copytree, rmtree
 from subprocess import run
+from sys import exit
 from time import time
 from uuid import uuid4
 from zipfile import ZipFile
@@ -27,6 +28,35 @@ def download_file(url: str, dest: str, session=session):
                 f.write(chunk)
 
 
+def download_depends(file: str, version: str, pack: str):
+    print(colored("downloading dependencies...", "yellow"))
+    with ZipFile(file, "r") as z:
+        z.extractall("/tmp/mod")
+
+    with open("/tmp/mod/fabric.mod.json", "r") as f:
+        data = json.load(f)
+
+    depends = data["depends"]
+    for dep in depends:
+        params = {
+            "query": dep,
+            "facets": f'[["project_type:mod"], ["categories:fabric"], ["versions:{version}"]]',
+        }
+        response = requests.get("https://api.modrinth.com/v2/search", params=params)
+        r_data = response.json()
+        hits = r_data["hits"]
+        project_id = hits[0]["project_id"]
+        versions = requests.get(
+            f"https://api.modrinth.com/v2/project/{project_id}/version"
+        ).json()
+        for v in versions:
+            if version in v["game_versions"] and "fabric" in v["loaders"]:
+                file_url = v["files"][0]["url"]
+                file_name = v["files"][0]["filename"]
+                dir = f"{MC_DIR}/instances/{pack}/mods/{file_name}"
+                download_file(file_url, dir)
+
+
 def extract_modpack(file):
     with ZipFile(file, "r") as z:
         z.extractall("/tmp/modpack")
@@ -34,6 +64,10 @@ def extract_modpack(file):
 
 def get_modpacks():
     return listdir(f"{MC_DIR}/instances")
+
+
+def confirm(txt: str):
+    return input(f"{txt} [y/n] -> ") in ["Y", "y", ""]
 
 
 def choose(lst: list, stuff: str = "stuff"):
@@ -119,7 +153,7 @@ def install_modpack():
         )
         download_file(url, downloads[url])
 
-    print(f"\ndownloaded mods in {round(time() - st, 2)}s!")
+    print(colored(f"downloaded mods in {round(time() - st, 2)}s!", "green"))
 
     with open(f"{MC_DIR}/launcher_profiles.json", "r") as f:
         launcher_data = json.load(f)
@@ -154,6 +188,9 @@ def remove_mod():
         mods.append(m)
 
     remove(f"{mods_dir}/{choose(mods)}")
+
+    if confirm("another"):
+        remove_mod()
 
 
 def remove_modpack():
@@ -257,12 +294,13 @@ def search_modrinth(type=None, version=None, modpack=None):
                 dir = f"{MC_DIR}/instances/{modpack}/{dirs[type]}/{file_name}"
                 makedirs(abspath(dirname(dir)), exist_ok=True)
                 download_file(file_url, dir)
+                download_depends(dir, version, modpack)
                 try:
-                    if input("another [y/n] -> ") in ["Y", "y", ""]:
+                    if confirm("another"):
                         search_modrinth(type, version, modpack)
                     exit()
                 except (EOFError, KeyboardInterrupt):
-                    print(colored("no input provided, restarting"))
+                    print(colored("no input provided, restarting", "red"))
                     main()
             download_file(file_url, dir)
             if type == "modpack":
