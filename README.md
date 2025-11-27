@@ -1,3 +1,4 @@
 # Requirements
 - python
 - requests
+- termcolor
