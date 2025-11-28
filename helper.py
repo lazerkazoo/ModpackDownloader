@@ -1,13 +1,13 @@
 import json
 from os import listdir, makedirs
-from os.path import dirname, exists
+from os.path import dirname, exists, expanduser
 from shutil import rmtree
 from zipfile import ZipFile
 
 import requests
 from termcolor import colored
 
-from main import MC_DIR, main
+MC_DIR = f"{expanduser('~')}/.minecraft"
 
 session = requests.session()
 
@@ -39,7 +39,6 @@ def confirm(txt: str):
 def choose(lst: list, stuff: str = "stuff"):
     if len(lst) <= 0:
         print(colored(f"no {stuff}s installed!", "yellow"))
-        main()
     for num, i in enumerate(lst):
         print(f"[{num + 1}] {i}")
 
