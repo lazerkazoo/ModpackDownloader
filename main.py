@@ -217,13 +217,13 @@ def update_modpack():
         mod_url = file_entry["downloads"][0]
         project_id = mod_url.split("/data/")[1].split("/")[0]
 
-        print(colored(f"Checking for updates for {file_entry['path']}...", "yellow"))
+        print(colored(f"checking for updates for {file_entry['path']}...", "yellow"))
 
         versions_response = requests.get(
             f"https://api.modrinth.com/v2/project/{project_id}/version"
         )
         if not versions_response.ok:
-            print(colored(f"Failed to fetch versions for {file_entry['path']}", "red"))
+            print(colored(f"failed to fetch versions for {file_entry['path']}", "red"))
             continue
 
         versions = versions_response.json()
@@ -239,7 +239,7 @@ def update_modpack():
 
         if latest_version is None:
             print(
-                colored(f"No compatible versions found for {file_entry['path']}", "red")
+                colored(f"no compatible versions found for {file_entry['path']}", "red")
             )
             continue
 
@@ -250,7 +250,7 @@ def update_modpack():
             print(colored(f"{file_entry['path']} is already up-to-date.", "green"))
             continue
 
-        print(colored(f"Updating {file_entry['path']}...", "yellow"))
+        print(colored(f"updating {file_entry['path']}...", "yellow"))
 
         file_url = latest_version["files"][0]["url"]
         file_name = latest_version["files"][0]["filename"]
@@ -268,7 +268,7 @@ def update_modpack():
 
     save_json(f"{MC_DIR}/instances/{pack}/mrpack/modrinth.index.json", pack_index)
 
-    print(colored(f"Update complete for {pack}!", "green"))
+    print(colored(f"update complete for {pack}!", "green"))
 
 
 def download_modpack():
@@ -476,7 +476,7 @@ def search_modrinth(type=None, version=None, modpack=None):
             tmp_path = f"/tmp/{file_name}"
             download_file(file_url, tmp_path)
 
-            extract_modpack(tmp_path, "modpack")
+            extract(tmp_path, "modpack")
             install_modpack()
             return
 
