@@ -35,6 +35,7 @@ def change_modpack_ver():
     copytree(f"{get_mrpack(pack)}", "/tmp/modpack")
     rmtree(f"{MC_DIR}/versions/{index_data['name']}")
     rmtree(f"{INST_DIR}/{index_data['name']}")
+    remove_modpack(pack)
 
     install_modpack()
     update_modpack(pack)
@@ -251,8 +252,9 @@ def remove_mod(pack=None):
         remove_mod(pack)
 
 
-def remove_modpack():
-    pack = choose(get_modpacks(), "modpack")
+def remove_modpack(pack: None):
+    if pack is None:
+        pack = choose(get_modpacks(), "modpack")
     profiles_file = f"{MC_DIR}/launcher_profiles.json"
 
     launcher_data = load_json(profiles_file)
