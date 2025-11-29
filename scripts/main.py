@@ -7,7 +7,7 @@ from time import time
 import requests
 from termcolor import colored
 
-from scripts.constants import DOWNLOADS, MC_DIR
+from scripts.constants import DOWNLOADS, INST_DIR, MC_DIR
 from scripts.helper import (
     choose,
     confirm,
@@ -16,6 +16,7 @@ from scripts.helper import (
     extract,
     get_modpacks,
     get_modrinth_index,
+    get_mrpack,
     install_modpack,
     load_json,
     remove_temps,
@@ -60,8 +61,8 @@ def custom_modpack():
 def update_modpack():
     st = time()
     pack = choose(get_modpacks(), "modpacks")
-    mods_dir = f"{MC_DIR}/instances/{pack}/mods"
-    pack_index = get_modrinth_index(f"{MC_DIR}/instances/{pack}/mrpack")
+    mods_dir = f"{INST_DIR}/{pack}/mods"
+    pack_index = get_modrinth_index(get_mrpack(pack))
     mc_version = pack_index["dependencies"]["minecraft"]
 
     for num, file_entry in enumerate(pack_index["files"]):
@@ -124,7 +125,7 @@ def update_modpack():
         file_entry["downloads"] = [file_url]
         file_entry["fileSize"] = latest_version["files"][0]["size"]
 
-    save_json(f"{MC_DIR}/instances/{pack}/mrpack/modrinth.index.json", pack_index)
+    save_json(f"{get_mrpack(pack)}/modrinth.index.json", pack_index)
 
     print(colored(f"update complete for {pack}", "green"))
     print(colored(f"updated in {round(time() - st, 2)}", "green"))
@@ -142,16 +143,16 @@ def export_modpack():
     if confirm("copy resource/shader packs"):
         try:
             copytree(
-                f"{MC_DIR}/instances/{pack}/resourcepacks",
-                f"{MC_DIR}/instances/{pack}/mrpack/overrides",
+                f"{INST_DIR}/{pack}/resourcepacks",
+                f"{get_mrpack(pack)}/overrides",
                 dirs_exist_ok=True,
             )
         except Exception:
             pass
         try:
             copytree(
-                f"{MC_DIR}/instances/{pack}/shaderpacks",
-                f"{MC_DIR}/instances/{pack}/mrpack/overrides",
+                f"{INST_DIR}/{pack}/shaderpacks",
+                f"{get_mrpack}/overrides",
                 dirs_exist_ok=True,
             )
         except Exception:
@@ -159,7 +160,7 @@ def export_modpack():
         make_archive(
             f"{DOWNLOADS}/{pack}",  # where the zip will be created
             "zip",
-            root_dir=f"{MC_DIR}/instances/{pack}/mrpack",
+            root_dir=f"{get_mrpack(pack)}",
         )
         rename(f"{DOWNLOADS}/{pack}.zip", f"{DOWNLOADS}/{pack}.mrpack")
 
@@ -167,8 +168,8 @@ def export_modpack():
 def remove_mod(pack=None):
     if pack is None:
         pack = choose(get_modpacks(), "modpack")
-    pack_index = get_modrinth_index(f"{MC_DIR}/instances/{pack}/mrpack")
-    mods_dir = f"{MC_DIR}/instances/{pack}/mods"
+    pack_index = get_modrinth_index(f"{get_mrpack(pack)}")
+    mods_dir = f"{INST_DIR}/{pack}/mods"
     mods = []
 
     for m in listdir(mods_dir):
@@ -197,7 +198,7 @@ def remove_mod(pack=None):
             for f in pack_index["files"]
             if not f["path"].lower().endswith(mod.lower())
         ]
-        save_json(f"{MC_DIR}/instances/{pack}/mrpack/modrinth.index.json", pack_index)
+        save_json(f"{get_mrpack(pack)}/modrinth.index.json", pack_index)
 
     if confirm("another"):
         remove_mod(pack)
@@ -222,7 +223,7 @@ def remove_modpack():
     save_json(profiles_file, launcher_data)
 
     for path in [
-        f"{MC_DIR}/instances/{pack}",
+        f"{INST_DIR}/{pack}",
         f"{MC_DIR}/versions/{pack}",
     ]:
         if exists(path):
@@ -237,7 +238,7 @@ def search_modrinth(type=None, version=None, modpack=None):
 
         if type != "modpack":
             modpack = choose(get_modpacks(), "modpack")
-            index_file = f"{MC_DIR}/instances/{modpack}/mrpack/modrinth.index.json"
+            index_file = f"{get_mrpack(modpack)}/modrinth.index.json"
             version = json.load(open(index_file))["dependencies"]["minecraft"]
 
     if version is None:
@@ -291,8 +292,8 @@ def search_modrinth(type=None, version=None, modpack=None):
             }
 
             if type != "modpack":
-                index_file = get_modrinth_index(f"{MC_DIR}/instances/{modpack}/mrpack/")
-                type_dir = f"{MC_DIR}/instances/{modpack}/{dirs[type]}"
+                index_file = get_modrinth_index(f"{get_mrpack(modpack)}/")
+                type_dir = f"{INST_DIR}/{modpack}/{dirs[type]}"
                 target = f"{type_dir}/{file_name}"
 
                 makedirs(abspath(type_dir), exist_ok=True)
@@ -319,7 +320,7 @@ def search_modrinth(type=None, version=None, modpack=None):
                 index_file["files"].append(new_entry)
 
                 save_json(
-                    f"{MC_DIR}/instances/{modpack}/mrpack/modrinth.index.json",
+                    f"{get_mrpack(modpack)}/mrpack/modrinth.index.json",
                     index_file,
                 )
 

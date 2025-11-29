@@ -11,7 +11,7 @@ from zipfile import ZipFile
 import requests
 from termcolor import colored
 
-from scripts.constants import MC_DIR
+from scripts.constants import INST_DIR, MC_DIR
 
 session = requests.session()
 
@@ -40,8 +40,8 @@ def remove_temps():
 
 
 def get_modpacks():
-    if exists(f"{MC_DIR}/instances"):
-        return listdir(f"{MC_DIR}/instances")
+    if exists(f"{INST_DIR}"):
+        return listdir(f"{INST_DIR}")
     return []
 
 
@@ -68,6 +68,10 @@ def save_json(file: str, js):
 def load_json(file: str):
     with open(file, "r") as f:
         return json.load(f)
+
+
+def get_mrpack(pack: str):
+    return f"{INST_DIR}/{pack}/mrpack"
 
 
 def get_modrinth_index(folder="/tmp/modpack/"):
@@ -110,9 +114,9 @@ def download_depends(file: str, version: str, pack: str):
             if version in v["game_versions"] and "fabric" in v["loaders"]:
                 file_url = v["files"][0]["url"]
                 file_name = v["files"][0]["filename"]
-                if file_name in listdir(f"{MC_DIR}/instances/{pack}/mods"):
+                if file_name in listdir(f"{INST_DIR}/{pack}/mods"):
                     continue
-                mods_dir = f"{MC_DIR}/instances/{pack}/mods"
+                mods_dir = f"{INST_DIR}/{pack}/mods"
                 download_file(file_url, f"{mods_dir}/{file_name}")
 
 
@@ -146,10 +150,8 @@ def install_modpack():
     depends = data["dependencies"]
     name = data["name"]
     files = data["files"]
-    dir = f"{MC_DIR}/instances/{name}"
-    copytree(
-        "/tmp/modpack/overrides/", f"{MC_DIR}/instances/{name}/", dirs_exist_ok=True
-    )
+    dir = f"{INST_DIR}/{name}"
+    copytree("/tmp/modpack/overrides/", f"{INST_DIR}/{name}/", dirs_exist_ok=True)
     makedirs(f"{dir}/mods", exist_ok=True)
 
     install_fabric(depends["minecraft"], depends["fabric-loader"])
@@ -203,7 +205,7 @@ def install_modpack():
         "name": name,
         "type": "custom",
         "lastVersionId": name,
-        "gameDir": f"{MC_DIR}/instances/{name}",
+        "gameDir": f"{INST_DIR}/{name}",
     }
 
     save_json(f"{MC_DIR}/launcher_profiles.json", launcher_data)
