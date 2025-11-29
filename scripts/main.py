@@ -2,7 +2,7 @@ import json
 from os import listdir, makedirs, remove, rename
 from os.path import abspath, basename, exists
 from shutil import copytree, make_archive, rmtree
-from time import time
+from time import sleep, time
 
 import requests
 from termcolor import colored
@@ -22,6 +22,22 @@ from scripts.helper import (
     remove_temps,
     save_json,
 )
+
+
+def change_modpack_ver():
+    pack = choose(get_modpacks(), "modpack")
+    version = input("choose version -> ")
+    index_data = get_modrinth_index(get_mrpack(pack))
+
+    index_data["dependencies"]["minecraft"] = version
+
+    save_json(f"{get_mrpack(pack)}/modrinth.index.json", index_data)
+    copytree(f"{get_mrpack(pack)}", "/tmp/modpack")
+    rmtree(f"{MC_DIR}/versions/{index_data['name']}")
+    rmtree(f"{INST_DIR}/{index_data['name']}")
+
+    install_modpack()
+    update_modpack(pack)
 
 
 def custom_modpack():
@@ -58,19 +74,32 @@ def custom_modpack():
     install_modpack()
 
 
-def update_modpack():
+def update_modpack(pack=None):
     st = time()
-    pack = choose(get_modpacks(), "modpacks")
+    if pack is None:
+        pack = choose(get_modpacks(), "modpacks")
     mods_dir = f"{INST_DIR}/{pack}/mods"
     pack_index = get_modrinth_index(get_mrpack(pack))
     mc_version = pack_index["dependencies"]["minecraft"]
 
+    new_files = []
     for num, file_entry in enumerate(pack_index["files"]):
+        new_files.append(file_entry)
         if not file_entry["path"].startswith("mods/"):
             continue
 
         mod_url = file_entry["downloads"][0]
-        project_id = mod_url.split("/data/")[1].split("/")[0]
+        try:
+            project_id = mod_url.split("/data/")[1].split("/")[0]
+        except Exception:
+            print(
+                colored(
+                    f"no compatible versions found for {file_entry['path']}, removing mod",
+                    "red",
+                )
+            )
+            new_files.remove(file_entry)
+            continue
 
         print(
             colored(
@@ -83,7 +112,13 @@ def update_modpack():
             f"https://api.modrinth.com/v2/project/{project_id}/version"
         )
         if not versions_response.ok:
-            print(colored(f"failed to fetch versions for {file_entry['path']}", "red"))
+            print(
+                colored(
+                    f"failed to fetch versions for {file_entry['path']}, removing mod",
+                    "red",
+                )
+            )
+            new_files.remove(file_entry)
             continue
 
         versions = versions_response.json()
@@ -99,8 +134,12 @@ def update_modpack():
 
         if latest_version is None:
             print(
-                colored(f"no compatible versions found for {file_entry['path']}", "red")
+                colored(
+                    f"no compatible versions found for {file_entry['path']}, removing mod",
+                    "red",
+                )
             )
+            new_files.remove(file_entry)
             continue
 
         latest_sha1 = latest_version["files"][0]["hashes"]["sha1"]
@@ -125,6 +164,7 @@ def update_modpack():
         file_entry["downloads"] = [file_url]
         file_entry["fileSize"] = latest_version["files"][0]["size"]
 
+    pack_index["files"] = new_files
     save_json(f"{get_mrpack(pack)}/modrinth.index.json", pack_index)
 
     print(colored(f"update complete for {pack}", "green"))
@@ -152,7 +192,7 @@ def export_modpack():
         try:
             copytree(
                 f"{INST_DIR}/{pack}/shaderpacks",
-                f"{get_mrpack}/overrides",
+                f"{get_mrpack(pack)}/overrides",
                 dirs_exist_ok=True,
             )
         except Exception:
@@ -180,6 +220,7 @@ def remove_mod(pack=None):
         print(f"[{num + 1}] {m}")
 
     mod = input("choose [can enter name] -> ")
+    mod_ = mod
 
     try:
         mod = int(mod) - 1
@@ -189,6 +230,12 @@ def remove_mod(pack=None):
             if i.lower().startswith(mod.lower()):
                 mod = i
                 break
+
+    if mod == mod_:
+        print(colored("could not find that mod, try again", "red"))
+        sleep(0.5)
+        remove_mod(pack)
+        return
 
     if confirm(f"remove {mod}"):
         remove(f"{mods_dir}/{mod}")
@@ -345,20 +392,21 @@ def main():
     options = {
         "search modrinth": search_modrinth,
         "remove mod from modpack": remove_mod,
+        "update modpack mods": update_modpack,
         "modpack": {
-            "update modpack mods": update_modpack,
             "create custom modpack": custom_modpack,
             "download modpack from file": download_modpack,
+            "change version of modpack": change_modpack_ver,
             "remove modpack": remove_modpack,
             "export modpack": export_modpack,
         },
     }
 
-    choice = options[choose(list(options.keys()))]
-    if isinstance(choice, dict):
-        choice[choose(list(choice.keys()))]()
+    choice = choose(list(options.keys()))
+    if isinstance(options[choice], dict):
+        options[choice][choose(list(options[choice].keys()))]()
     else:
-        choice()
+        options[choice]()
 
     if confirm("do other stuff"):
         main()

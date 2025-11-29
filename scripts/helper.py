@@ -56,7 +56,12 @@ def choose(lst: list, stuff: str = "stuff"):
     for num, i in enumerate(lst):
         print(f"[{num + 1}] {i}")
 
-    return lst[int(input("choose -> ")) - 1]
+    choice = int(input("choose -> ")) - 1
+    if choice > len(lst) - 1 or choice < 0:
+        print(colored("that is not an option try again", "red"))
+        return choose(lst, stuff)
+
+    return lst[choice]
 
 
 def save_json(file: str, js):
@@ -74,8 +79,7 @@ def get_mrpack(pack: str):
 
 
 def get_modrinth_index(folder="/tmp/modpack/"):
-    with open(f"{folder}/modrinth.index.json", "r") as f:
-        return json.load(f)
+    return load_json(f"{folder}/modrinth.index.json")
 
 
 def download_depends(file: str, version: str, pack: str):
@@ -172,7 +176,6 @@ def install_modpack():
         f"{MC_DIR}/versions/{name}/{name}.jar",
     )
 
-    # Update the JSON to have correct id
     with open(f"{MC_DIR}/versions/{name}/{name}.json", "r") as f:
         version_data = json.load(f)
     version_data["id"] = name
@@ -209,5 +212,9 @@ def install_modpack():
 
     save_json(f"{MC_DIR}/launcher_profiles.json", launcher_data)
 
-    print(f"created launcher profile '{name}' in {time() - st}")
+    print(
+        colored(
+            f"created launcher profile '{name}' in {round(time() - st, 2)}s", "green"
+        )
+    )
     copytree("/tmp/modpack", f"{dir}/mrpack", dirs_exist_ok=True)
