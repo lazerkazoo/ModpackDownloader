@@ -53,7 +53,6 @@ def choose(lst: list, stuff: str = "stuff"):
     if len(lst) <= 0:
         print(colored(f"no {stuff}s installed!", "yellow"))
         exit()
-        return
     for num, i in enumerate(lst):
         print(f"[{num + 1}] {i}")
 
@@ -87,12 +86,12 @@ def download_depends(file: str, version: str, pack: str):
     depends = data["depends"]
     if "minecraft" in depends:
         depends.pop("minecraft")
-    if "fabricloader" in depends:
-        depends.pop("fabricloader")
-    if "fabric-api" in depends:
-        depends.pop("fabric-api")
     if "java" in depends:
         depends.pop("java")
+
+    for i in list(depends):
+        if i.startswith("fabric"):
+            depends.pop(i)
 
     if len(depends) <= 0:
         return

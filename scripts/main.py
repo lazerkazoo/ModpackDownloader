@@ -326,7 +326,6 @@ def search_modrinth(type=None, version=None, modpack=None):
 
                 if confirm("another"):
                     return search_modrinth(type, version, modpack)
-                exit()
 
             # MODPACK INSTALLATION
             tmp_path = f"/tmp/{file_name}"
